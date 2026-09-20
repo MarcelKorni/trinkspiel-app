@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import TeamSetupScreen from './screens/TeamSetupScreen';
 import GameSelectionScreen from './screens/GameSelectionScreen';
 import GameScreen from './screens/GameScreen';
+import RandomModeScreen from './screens/RandomModeScreen';
 
 /**
  * Kein Dashboard mehr - die Spielauswahl ist die Startseite. Teams werden
@@ -17,6 +18,7 @@ export default function App() {
       <Route path="/setup" element={<TeamSetupScreen />} />
       <Route path="/games" element={<GameSelectionScreen />} />
       <Route path="/games/:gameId" element={<GameScreen />} />
+      <Route path="/random" element={<RandomModeScreen />} />
       <Route path="*" element={<Navigate to="/games" replace />} />
     </Routes>
   );

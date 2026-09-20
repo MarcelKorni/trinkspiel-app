@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useStatsStore } from '../store/useStatsStore';
 
 interface ShotAlarmProps {
   onContinue: () => void;
@@ -76,6 +77,7 @@ export function ShotAlarm({ onContinue }: ShotAlarmProps) {
     audioElRef.current?.pause();
     stopSireneRef.current();
     audioCtxRef.current?.close();
+    useStatsStore.getState().recordShotAlarm();
     onContinue();
   }
 

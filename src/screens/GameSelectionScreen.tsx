@@ -51,6 +51,10 @@ export default function GameSelectionScreen() {
         </div>
       )}
 
+      <button onClick={() => navigate('/random')} className="btn-primary mb-6 w-full">
+        🎲 Zufallsmodus – alle Spiele nacheinander
+      </button>
+
       {categories.map((category) => {
         const gamesInCategory = games.filter((g) => g.kategorie === category);
         if (gamesInCategory.length === 0) return null;

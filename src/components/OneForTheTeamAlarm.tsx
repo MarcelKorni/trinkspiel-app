@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore, type TeamId } from '../store/useGameStore';
+import { useStatsStore } from '../store/useStatsStore';
 
 interface OneForTheTeamAlarmProps {
   onContinue: () => void;
@@ -133,7 +134,20 @@ export function OneForTheTeamAlarm({ onContinue }: OneForTheTeamAlarmProps) {
             })}
           </div>
 
-          <button onClick={onContinue} disabled={!alleAusgewertet} className="btn-primary mt-2 disabled:opacity-30">
+          <button
+            onClick={() => {
+              useStatsStore.getState().recordOneForTheTeam(
+                (['A', 'B'] as const).map((teamId) => ({
+                  teamId,
+                  ausgeloster: ausgeloste[teamId],
+                  geschafft: ergebnis[teamId],
+                }))
+              );
+              onContinue();
+            }}
+            disabled={!alleAusgewertet}
+            className="btn-primary mt-2 disabled:opacity-30"
+          >
             Weiter zur nächsten Runde
           </button>
         </div>
