@@ -3,14 +3,29 @@ import { games } from '../games';
 import { PageHeader } from '../components/PageHeader';
 import { useNavigate } from 'react-router-dom';
 import { OneForTheTeamAlarm } from '../components/OneForTheTeamAlarm';
-import { StatsSheet, StatsSummary } from '../components/StatsPanels';
+import { GameStatsEntry, StatsSheet, StatsSummary } from '../components/StatsPanels';
 import { useGameStore, type TeamId } from '../store/useGameStore';
 import { useStatsStore } from '../store/useStatsStore';
 
-type Phase = 'setup' | 'playing' | 'summary';
+type Phase = 'auswahl' | 'setup' | 'playing' | 'auswertung' | 'summary';
 
 const ALARM_MIN_MS = 20_000;
 const ALARM_MAX_MS = 45_000;
+const SELECTION_KEY = 'trinkspiel-random-games';
+
+function loadSelection(): string[] {
+  const all = games.map((g) => g.id);
+  try {
+    const stored = JSON.parse(localStorage.getItem(SELECTION_KEY) ?? 'null');
+    if (Array.isArray(stored)) {
+      const valid = all.filter((id) => stored.includes(id));
+      if (valid.length > 0) return valid;
+    }
+  } catch {
+    // ignorieren - dann sind alle Spiele ausgewaehlt
+  }
+  return all;
+}
 
 function shuffle<T>(items: T[]): T[] {
   const arr = [...items];
@@ -39,15 +54,16 @@ export default function RandomModeScreen() {
   const queueRef = useRef<string[]>([]);
   function drawGameId(lastId: string | null): string {
     if (queueRef.current.length === 0) {
-      const q = shuffle(games.map((g) => g.id));
+      const q = shuffle(selected);
       if (q.length > 1 && q[0] === lastId) [q[0], q[q.length - 1]] = [q[q.length - 1], q[0]];
       queueRef.current = q;
     }
     return queueRef.current.shift() as string;
   }
 
-  const [gameId, setGameId] = useState<string | null>(() => (games.length ? drawGameId(null) : null));
-  const [phase, setPhase] = useState<Phase>('setup');
+  const [selected, setSelected] = useState<string[]>(loadSelection);
+  const [gameId, setGameId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>('auswahl');
   const [teamMode, setTeamMode] = useState(false);
   const [zeigtAlarm, setZeigtAlarm] = useState(false);
   const [gespielt, setGespielt] = useState(0);
@@ -89,6 +105,27 @@ export default function RandomModeScreen() {
     if (zaehlen) setGespielt((n) => n + 1);
   }
 
+  function toggleSelected(id: string) {
+    setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  }
+
+  function auswahlBestaetigen() {
+    try {
+      localStorage.setItem(SELECTION_KEY, JSON.stringify(selected));
+    } catch {
+      // Speichern ist optional
+    }
+    queueRef.current = [];
+    setGameId(drawGameId(gameId));
+    setPhase('setup');
+  }
+
+  function spielBeendet() {
+    setZeigtAlarm(false);
+    if (allPlayers.length === 0) naechstesSpiel(true);
+    else setPhase('auswertung');
+  }
+
   function toggleTeamMode(value: boolean) {
     setTeamMode(value);
     if (value && allPlayers.length >= 2 && !teamsValid) autoAssignTeams();
@@ -104,6 +141,68 @@ export default function RandomModeScreen() {
   function toggleAssign(name: string, teamId: TeamId) {
     if (teams[teamId].players.includes(name)) unassignPlayer(name, teamId);
     else assignPlayer(name, teamId);
+  }
+
+  if (phase === 'auswahl') {
+    return (
+      <div className="page">
+        <PageHeader
+          title="🎲 Zufallsmodus"
+          subtitle="Welche Spiele sollen vorkommen?"
+          backTo={game ? undefined : '/games'}
+        />
+
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm text-white/60">
+            {selected.length} von {games.length} ausgewählt
+          </span>
+          <div className="flex gap-4 text-sm text-neon-teal">
+            <button onClick={() => setSelected(games.map((g) => g.id))}>Alle</button>
+            <button onClick={() => setSelected([])}>Keine</button>
+          </div>
+        </div>
+
+        <ul className="flex flex-col gap-2">
+          {games.map((g) => {
+            const an = selected.includes(g.id);
+            return (
+              <li key={g.id}>
+                <button
+                  onClick={() => toggleSelected(g.id)}
+                  aria-pressed={an}
+                  className={`card flex w-full items-center gap-3 text-left active:scale-95 ${
+                    an ? 'border-2 border-neon-pink' : 'opacity-50'
+                  }`}
+                >
+                  <span className="text-3xl">{g.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-bold">{g.name}</div>
+                    <p className="text-xs text-white/50">
+                      {g.brauchtTeams ? '👥 Team-Spiel' : '🙋 ohne feste Teams'}
+                    </p>
+                  </div>
+                  <span className="text-xl">{an ? '✅' : '⬜'}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="flex-1" />
+        <button
+          onClick={auswahlBestaetigen}
+          disabled={selected.length === 0}
+          className="btn-primary mt-6 disabled:opacity-30"
+        >
+          {game ? 'Übernehmen →' : 'Zufallsmodus starten →'}
+        </button>
+        {game && (
+          <button onClick={() => setPhase('setup')} className="btn-ghost mt-2 text-sm">
+            Abbrechen
+          </button>
+        )}
+      </div>
+    );
   }
 
   if (!game) {
@@ -154,6 +253,15 @@ export default function RandomModeScreen() {
     );
   }
 
+  if (phase === 'auswertung') {
+    return (
+      <div className="page">
+        <PageHeader title="🍻 Wer hat getrunken?" subtitle={`${game.name} · Spiel ${gespielt + 1}`} />
+        <GameStatsEntry names={allPlayers} onDone={() => naechstesSpiel(true)} />
+      </div>
+    );
+  }
+
   if (phase === 'playing') {
     return (
       <div className="page">
@@ -161,21 +269,21 @@ export default function RandomModeScreen() {
         <PageHeader title={game.name} subtitle={`Zufallsmodus · Spiel ${gespielt + 1}`} backTo="/games" />
 
         {GameComponent ? (
-          <GameComponent key={`${gameId}-${gespielt}`} onExit={() => naechstesSpiel(true)} />
+          <GameComponent key={`${gameId}-${gespielt}`} onExit={spielBeendet} />
         ) : (
           <>
             <p className="mb-4 text-sm text-white/60">{game.beschreibung}</p>
             {teamMode && <TeamOverview teams={teams} />}
             <div className="flex-1" />
-            <button onClick={() => naechstesSpiel(true)} className="btn-primary mt-6">
-              Spiel beendet – nächstes Spiel 🎲
+            <button onClick={spielBeendet} className="btn-primary mt-6">
+              Spiel beendet 🎲
             </button>
           </>
         )}
 
         {GameComponent && (
-          <button onClick={() => naechstesSpiel(true)} className="btn-ghost mt-6 text-sm">
-            Spiel überspringen →
+          <button onClick={spielBeendet} className="btn-ghost mt-6 text-sm">
+            Spiel beenden →
           </button>
         )}
 
@@ -300,6 +408,9 @@ export default function RandomModeScreen() {
       </button>
       <button onClick={() => naechstesSpiel(false)} className="btn-ghost mt-2 text-sm">
         🎲 Anderes Spiel würfeln
+      </button>
+      <button onClick={() => setPhase('auswahl')} className="btn-ghost mt-2 text-sm">
+        🎯 Spiele auswählen ({selected.length}/{games.length})
       </button>
       <button onClick={() => setPhase('summary')} className="btn-secondary mt-2 mb-16">
         🏁 Abend beenden – Übersicht

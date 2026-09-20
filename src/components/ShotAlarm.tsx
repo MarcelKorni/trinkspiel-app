@@ -8,7 +8,7 @@ interface ShotAlarmProps {
 /** Optionale eigene Audiodatei (z.B. ein legal erworbener Song) - einfach unter
  * public/shot-alarm.mp3 ablegen, dann wird sie automatisch statt der
  * generierten Sirene abgespielt. */
-const CUSTOM_AUDIO_SRC = '/shot-alarm.mp3';
+const CUSTOM_AUDIO_SRC = `${import.meta.env.BASE_URL}shot-alarm.mp3`;
 
 /**
  * Vollflaechiger "Shotalarm": alle Teams muessen einen Shot trinken.

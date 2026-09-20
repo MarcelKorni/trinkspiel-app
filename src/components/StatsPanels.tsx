@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useGameStore } from '../store/useGameStore';
 import { useStatsStore, type PlayerStats, type StatKind } from '../store/useStatsStore';
 
@@ -78,6 +79,82 @@ export function StatsSheet({ onClose }: { onClose: () => void }) {
           Fertig
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Eintrag direkt nach einem Spiel: wer hat in dieser Runde wie viel getrunken? */
+export function GameStatsEntry({
+  names,
+  onDone,
+}: {
+  names: string[];
+  onDone: () => void;
+}) {
+  const adjust = useStatsStore((s) => s.adjust);
+  const [draft, setDraft] = useState<Record<string, PlayerStats>>({});
+
+  function change(name: string, kind: StatKind, delta: number) {
+    setDraft((d) => {
+      const cur = d[name] ?? EMPTY;
+      return { ...d, [name]: { ...cur, [kind]: Math.max(0, cur[kind] + delta) } };
+    });
+  }
+
+  function save() {
+    for (const [name, s] of Object.entries(draft)) {
+      for (const { kind } of STAT_KINDS) if (s[kind] > 0) adjust(name, kind, s[kind]);
+    }
+    onDone();
+  }
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <p className="mb-4 text-sm text-white/60">Wer hat in diesem Spiel wie viel getrunken?</p>
+      <ul className="flex flex-col gap-3">
+        {names.map((name) => {
+          const s = draft[name] ?? EMPTY;
+          return (
+            <li key={name} className="card">
+              <p className="mb-2 font-bold">{name}</p>
+              <div className="grid grid-cols-3 gap-2">
+                {STAT_KINDS.map(({ kind, label, icon }) => (
+                  <div key={kind} className="flex flex-col items-center gap-1 rounded-xl bg-base-800 p-2">
+                    <span className="text-xs text-white/60">
+                      {icon} {label}
+                    </span>
+                    <span className="text-2xl font-black">{s[kind]}</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => change(name, kind, -1)}
+                        className="h-9 w-9 rounded-lg bg-base-900 text-lg active:scale-90"
+                        aria-label={`${name} ${label} minus`}
+                      >
+                        −
+                      </button>
+                      <button
+                        onClick={() => change(name, kind, 1)}
+                        className="h-9 w-9 rounded-lg bg-neon-pink text-lg font-bold text-base-950 active:scale-90"
+                        aria-label={`${name} ${label} plus`}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="flex-1" />
+      <button onClick={save} className="btn-primary mt-6">
+        Speichern & weiter →
+      </button>
+      <button onClick={onDone} className="btn-ghost mt-2 text-sm">
+        Nichts eintragen
+      </button>
     </div>
   );
 }

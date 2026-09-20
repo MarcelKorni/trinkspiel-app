@@ -6,7 +6,7 @@ interface OneForTheTeamAlarmProps {
   onContinue: () => void;
 }
 
-const AUDIO_SRC = '/oneForTheTeam.mp3';
+const AUDIO_SRC = `${import.meta.env.BASE_URL}oneForTheTeam.mp3`;
 
 type Phase = 'laeuft' | 'ausgewertet';
 
